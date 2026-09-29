@@ -1,0 +1,29 @@
+# Local scan history (regenerated on first run of the webapp)
+sentinel_history.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+package-lock.json
+
+# Local AI-client config
+.mcp.json
+.claude/
+.opencode/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Network Graph — {{ title }}</title>
+<style>
+:root { --bg:#0b1020; --card:#151b2e; --line:#2a3350; --accent:#38bdf8; --ok:#34d399; --txt:#e2e8f0; --muted:#94a3b8; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:Segoe UI, system-ui, sans-serif; background:var(--bg); color:var(--txt); }
+nav { position:sticky; top:0; z-index:50; background:#0d1428ee; backdrop-filter:blur(6px); border-bottom:1px solid var(--line); padding:12px 24px; display:flex; align-items:center; gap:18px; }
+nav .brand { font-weight:800; font-size:16px; } nav .brand span { color:var(--accent); }
+nav a { color:var(--muted); text-decoration:none; font-size:13px; } nav a:hover { color:var(--txt); }
+main { max-width:1100px; margin:0 auto; padding:20px 16px; }
+h1 { font-size:20px; } h1 span { color:var(--accent); }
+.stats { display:flex; gap:14px; margin:10px 0 16px; flex-wrap:wrap; }
+.stat { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 16px; }
+.stat b { color:var(--accent); }
+.graphwrap { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; overflow:auto; }
+    .graphwrap svg { display:block; max-width:none; cursor:grab; }
+    .graphwrap svg:active { cursor:grabbing; }
+#graph { display:block; margin:0 auto; }
+.node { cursor:pointer; }
+.node circle { transition:fill .15s, r .15s; }
+.node text { fill:var(--txt); font-size:11px; pointer-events:none; }
+.node:hover circle { stroke:var(--accent); stroke-width:2.5; }
+.line { stroke:var(--line); stroke-width:1.4; transition:stroke .15s, opacity .15s; }
+.line.hot { stroke:var(--accent); stroke-width:2.4; }
+.line.dim { opacity:.12; }
+.sidebar { position:fixed; right:16px; top:76px; width:min(320px, 92vw); background:var(--card); border:1px solid var(--accent); border-radius:12px; padding:16px; box-shadow:0 14px 40px rgba(0,0,0,.5); display:none; }
+.sidebar h3 { margin:0 0 10px; font-size:14px; color:var(--accent); }
+.sidebar table { width:100%; font-size:12px; }
+.sidebar th, .sidebar td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--line); }
+.sidebar a { display:inline-block; margin-top:12px; color:var(--accent); font-size:12px; }
+.btn { background:#0b1020; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:6px 12px; cursor:pointer; margin-right:8px; }
+.btn:hover { border-color:var(--accent); }
+.legend { display:flex; gap:16px; margin:12px 0; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+.legend span::before { content:""; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
+.legend .domain::before{background:var(--warn,#fbbf24);} .legend .sub::before{background:#38bdf8;}
+.legend .ip::before{background:#34d399;} .legend .port::before{background:#f87171;}
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">🛰️ <span>SentinelBridge</span></span>
+  <span style="flex:1"></span>
+  <a href="/dashboard">Dashboard</a>
+  <a href="/">Overview</a>
+</nav>
+
+<main>
+  <h1>🕸️ Network Graph — <span>{{ title }}</span></h1>
+  <div class="stats">
+    <div class="stat"><b>{{ g.stats.hosts }}</b> subdomains</div>
+    <div class="stat"><b>{{ g.stats.ips }}</b> IPs</div>
+    <div class="stat"><b>{{ g.stats.ports }}</b> open ports</div>
+  </div>
+  <div class="legend">
+    <span class="domain">domain</span><span class="sub">subdomain</span>
+    <span class="ip">IP address</span><span class="port">open port</span>
+  </div>
+  <div style="margin-bottom:10px">
+    <button class="btn" id="zIn">🔍 +</button>
+    <button class="btn" id="zOut">🔍 −</button>
+    <button class="btn" id="zFit">Fit view</button>
+  </div>
+  <div class="graphwrap">
+    <svg id="graph" viewBox="0 0 900 620" width="900"></svg>
+  </div>
+  <p style="color:var(--muted);font-size:12px">Click any node for details · hover to highlight its connections · scroll to zoom, drag to pan.</p>
+</main>
+
+<div class="sidebar" id="side">
+  <h3 id="sideTitle">Node</h3>
+  <table id="sideRows"></table>
+  <a href="#" id="sideClose">✕ close</a>
+</div>
+
+<script>
+const NODES = {{ g.nodes | tojson }};
+const EDGES = {{ g.edges | tojson }};
+const ROOT = {{ g.root | tojson }};
+
+const COLORS = { domain: "#fbbf24", sub: "#38bdf8", ip: "#34d399", port: "#f87171" };
+const X = { domain: 60, sub: 250, ip: 480, port: 700 };
+
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("graph");
+const W = 900;
+
+function layout() {
+  const subs = NODES.filter(n => n.kind === "sub");
+
+  // how much vertical room each row needs depends on ports + IPs hanging below it
+  const hostOf = {};
+  EDGES.forEach(e => { if (e[1].startsWith("ip:") || e[1].startsWith("port:")) hostOf[e[1]] = e[0]; });
+  const perHost = {};
+  NODES.forEach(n => { if (n.kind === "port" || n.kind === "ip") perHost[hostOf[n.id]] = (perHost[hostOf[n.id]] || 0) + 1; });
+  const maxRow = Math.max(1, ...Object.values(perHost).map(v => v));
+  const spacing = Math.max(54, 40 + maxRow * 22);
+  const H = Math.max(620, 130 + subs.length * spacing + 180);
+
+  const subY = {};
+  subs.forEach((n, i) => subY[n.id] = 110 + i * spacing);
+
+  const pos = {};
+  pos[ROOT] = { x: X.domain, y: subs.length ? subY[subs[0].id] : 320 };
+  NODES.forEach(n => {
+    if (n.kind === "domain") { pos[n.id] = pos[ROOT]; }
+    else if (n.kind === "sub") { pos[n.id] = { x: X.sub, y: subY[n.id] }; }
+  });
+
+  const ipN = {}, portN = {};
+  NODES.forEach(n => {
+    const hostY = pos[hostOf[n.id]] ? pos[hostOf[n.id]].y : 320;
+    if (n.kind === "ip") {
+      ipN[hostOf[n.id]] = (ipN[hostOf[n.id]] || 0) + 1;
+      pos[n.id] = { x: X.ip, y: hostY + 16 + (ipN[hostOf[n.id]] - 1) * 22 };
+    } else if (n.kind === "port") {
+      portN[hostOf[n.id]] = (portN[hostOf[n.id]] || 0) + 1;
+      const base = hostY + 16 + (ipN[hostOf[n.id]] || 0) * 22 + 10;
+      pos[n.id] = { x: X.port, y: base + (portN[hostOf[n.id]] - 1) * 22 };
+    }
+  });
+  return { pos, H };
+}
+
+const L = layout();
+const POS = L.pos;
+svg.setAttribute("viewBox", "0 0 " + W + " " + L.H);
+svg.setAttribute("height", L.H);
+
+const viewport = document.createElementNS(NS, "g");
+
+// draw edges behind nodes
+EDGES.forEach(e => {
+  const l = document.createElementNS(NS, "line");
+  l.setAttribute("x1", POS[e[0]].x); l.setAttribute("y1", POS[e[0]].y);
+  l.setAttribute("x2", POS[e[1]].x); l.setAttribute("y2", POS[e[1]].y);
+  l.setAttribute("class", "line");
+  l.dataset.a = e[0]; l.dataset.b = e[1];
+  viewport.appendChild(l);
+});
+
+function shortLabel(n) {
+  let s = String(n.label);
+  if (n.kind === "ip" || n.kind === "port") return s;
+  return s.length > 20 ? s.slice(0, 18) + "…" : s;
+}
+
+NODES.forEach(n => {
+  const g = document.createElementNS(NS, "g");
+  g.setAttribute("class", "node");
+  g.dataset.id = n.id;
+  const c = document.createElementNS(NS, "circle");
+  c.setAttribute("cx", POS[n.id].x); c.setAttribute("cy", POS[n.id].y);
+  c.setAttribute("r", n.kind === "port" ? 9 : 12);
+  c.setAttribute("fill", COLORS[n.kind]);
+  g.appendChild(c);
+  const t = document.createElementNS(NS, "text");
+  t.setAttribute("x", POS[n.id].x + 17);
+  t.setAttribute("y", POS[n.id].y + 4);
+  t.setAttribute("text-anchor", "start");
+  t.setAttribute("font-size", n.kind === "domain" ? 13 : 11);
+  t.setAttribute("stroke", "#0b1020");
+  t.setAttribute("stroke-width", "3.5");
+  t.setAttribute("paint-order", "stroke");
+  t.textContent = shortLabel(n);
+  g.appendChild(t);
+  g.addEventListener("click", function (ev) { ev.stopPropagation(); show(n); });
+  g.addEventListener("mouseover", function () { highlight(n.id); });
+  g.addEventListener("mouseout", clearHighlight);
+  viewport.appendChild(g);
+});
+svg.appendChild(viewport);
+
+// ---- zoom / pan ----
+let scale = 1, tx = 0, ty = 0, drag = false, sx = 0, sy = 0, stx = 0, sty = 0, moved = false;
+function applyTransform() {
+  viewport.setAttribute("transform", "translate(" + tx + "," + ty + ") scale(" + scale + ")");
+}
+function zoomAt(f, cx, cy) {
+  const nx = scale * f;
+  const k = nx / scale;
+  tx = cx - (cx - tx) * k;
+  ty = cy - (cy - ty) * k;
+  scale = Math.max(0.3, Math.min(6, nx));
+  applyTransform();
+}
+svg.addEventListener("wheel", function (ev) {
+  ev.preventDefault();
+  const r = svg.getBoundingClientRect();
+  zoomAt(ev.deltaY < 0 ? 1.12 : 0.9, ev.clientX - r.left, ev.clientY - r.top);
+}, { passive: false });
+svg.addEventListener("mousedown", function (ev) { drag = true; moved = false; sx = ev.clientX; sy = ev.clientY; stx = tx; sty = ty; });
+window.addEventListener("mousemove", function (ev) {
+  if (!drag) return;
+  tx = stx + (ev.clientX - sx); ty = sty + (ev.clientY - sy);
+  if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 4) moved = true;
+  applyTransform();
+});
+window.addEventListener("mouseup", function () { drag = false; });
+function fit() { scale = 1; tx = 0; ty = 0; applyTransform(); }
+document.getElementById("zIn").addEventListener("click", function () { zoomAt(1.25, W / 2, 150); });
+document.getElementById("zOut").addEventListener("click", function () { zoomAt(0.8, W / 2, 150); });
+document.getElementById("zFit").addEventListener("click", fit);
+fit();
+
+function highlight(id) {
+  document.querySelectorAll(".line").forEach(l => {
+    const on = (l.dataset.a === id || l.dataset.b === id);
+    l.classList.toggle("hot", on);
+    l.classList.toggle("dim", !on);
+  });
+}
+function clearHighlight() {
+  document.querySelectorAll(".line").forEach(l => { l.classList.remove("hot", "dim"); });
+}
+
+function show(n) {
+  if (moved) return;
+  const side = document.getElementById("side");
+  document.getElementById("sideTitle").textContent =
+    ({domain: "🌐 Domain", sub: "🔗 Subdomain", ip: "📍 IP address", port: "🔌 Open port"}[n.kind]) + " — " + n.label;
+  const rows = document.getElementById("sideRows");
+  rows.innerHTML = "";
+  Object.keys(n.meta).forEach(k => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<th>" + k + "</th><td>" + (n.meta[k] || "—") + "</td>";
+    rows.appendChild(tr);
+  });
+  side.style.display = "block";
+  moved = false;
+}
+document.getElementById("sideClose").addEventListener("click", function (ev) {
+  ev.preventDefault(); document.getElementById("side").style.display = "none";
+});
+svg.addEventListener("click", function () { if (!moved) document.getElementById("side").style.display = "none"; });
+</script>
+</body>
+</html>

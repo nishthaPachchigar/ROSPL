@@ -1,0 +1,288 @@
+import io
+import json
+from datetime import datetime
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+ACCENT = colors.HexColor("#38bdf8")
+DARK = colors.HexColor("#0b1020")
+GREY = colors.HexColor("#4a5568")
+
+
+def _priority(epss):
+    if epss is None:
+        return "LOW"
+    if epss >= 0.9:
+        return "CRITICAL"
+    if epss >= 0.5:
+        return "HIGH"
+    if epss >= 0.1:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _risk_label(sev: str) -> str:
+    s = sev.lower()
+    if "critical" in s:
+        return "CRITICAL"
+    if "high" in s:
+        return "HIGH"
+    if "medium" in s or "moderate" in s:
+        return "MEDIUM"
+    if "low" in s:
+        return "LOW"
+    return "INFO"
+
+
+def _vuln_priority(vuln: dict) -> str:
+    """Combine severity labels with EPSS exploitation probability."""
+    if str(vuln.get("kev", "")).lower() in ("true", "yes", "1") or vuln.get("kev") is True:
+        return "CRITICAL"
+    sev = _risk_label(vuln.get("severity", ""))
+    epss = vuln.get("epss")
+    if epss is not None and float(epss) >= 0.9:
+        return "CRITICAL"
+    if epss is not None and float(epss) >= 0.1 and sev in ("MEDIUM", "HIGH", "CRITICAL"):
+        return "HIGH"
+    return sev
+
+
+def _host_table_rows(subdomains, ports, geo):
+    """yield (host, ip, location, ports) for markdown/report rendering."""
+    rows = []
+    for host in sorted(subdomains):
+        ip = subdomains[host]
+        loc = ""
+        if geo and geo.get(ip):
+            g = geo[ip]
+            loc = ", ".join(x for x in (g.get("country"), g.get("city"), g.get("isp")) if x)
+        open_ports = [p["port"] for p in (ports.get(host) or [])]
+        port_str = ",".join(map(str, open_ports)) if open_ports else "none"
+        rows.append((host, ip, loc, port_str))
+    return rows
+
+
+def build_markdown_report(audit: dict) -> str:
+    """Render a full_audit result as a human-readable Markdown report."""
+    now = datetime.now().isoformat(timespec="seconds")
+    lines = [
+        f"# SentinelBridge Audit Report",
+        f"**Target:** `{audit.get('target')}`",
+        f"**Generated:** {now}",
+        f"**Tool:** SentinelBridge — open-source OSINT + vulnerability intelligence",
+        "",
+    ]
+
+    subdomains = audit.get("subdomains", {})
+    ports = audit.get("ports", {})
+    geo = audit.get("geo", {})
+    lines.append("## 1. Attack Surface (Subdomains + Live Ports + Location)")
+    if subdomains:
+        lines.append("| Host | IP | Location | Open ports |")
+        lines.append("|---|---|---|---|")
+        for host, ip, loc, port_str in _host_table_rows(subdomains, ports, geo):
+            lines.append(f"| {host} | {ip} | {loc or '—'} | {port_str} |")
+    else:
+        lines.append("*Network recon skipped — no domain was provided for this audit.*")
+    lines.append("")
+
+    whois = audit.get("whois", {})
+    if whois:
+        lines.append("### Domain registration (RDAP/WHOIS)")
+        lines.append(f"- **Holder:** {whois.get('holder', '—')}")
+        lines.append(f"- **Registered:** {whois.get('registered', '—')}")
+        lines.append(f"- **Expires:** {whois.get('expires', '—')}")
+        lines.append("")
+
+    pkgs = audit.get("packages", [])
+    lines.append("## 2. Software Vulnerabilities (OSV + EPSS + CISA KEV)")
+    if pkgs:
+        lines.append("_Software identified from inventory scan or manual package list._")
+    for pkg in pkgs:
+        lines.append(f"### {pkg['name']} {pkg.get('version', '')}")
+        vulns = pkg.get("vulns", [])
+        if not vulns:
+            lines.append("*No known vulnerabilities on record.*")
+            continue
+        lines.append("| CVE | Priority | EPSS | KEV |")
+        lines.append("|---|---|---|---|")
+        for v in vulns:
+            lines.append(f"| `{v['id']}` | {_vuln_priority(v)} | {v.get('epss', '-')} | {'YES' if v.get('kev') else 'no'} |")
+        lines.append("")
+    if not pkgs:
+        lines.append("*No packages analysed.*")
+    lines.append("")
+
+    leaks = audit.get("leaks", [])
+    lines.append("## 3. Exposed Secrets (regex scan)")
+    if leaks:
+        lines.append("| File | Finding |")
+        lines.append("|---|---|")
+        for l in leaks:
+            lines.append(f"| `{l['file']}` | `{l['type']}` |")
+    else:
+        lines.append("*No obvious secrets found.*")
+    lines.append("")
+
+    git_hist = audit.get("git_history", [])
+    if git_hist:
+        lines.append("## 4. Secrets Ever Committed (git history)")
+        lines.append("_Deleted from the working tree but still stored in old commits._")
+        lines.append("| Commit | File | Finding |")
+        lines.append("|---|---|---|")
+        for g in git_hist:
+            lines.append(f"| `{g['commit']}` | `{g['file']}` | `{g['type']}` |")
+        lines.append("")
+
+    lines.append("---")
+    lines.append("> Generated by **SentinelBridge** — open-source AI security recon assistant.")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# PDF report
+# ---------------------------------------------------------------------------
+
+_cell_style = ParagraphStyle(
+    "cell", fontName="Helvetica", fontSize=7.5, leading=9.5, wordWrap="CJK",
+    textColor=colors.HexColor("#1e293b"),
+)
+
+
+def _pdf_table(headers, rows, widths=None):
+    data = [[Paragraph(str(c), _cell_style) for c in r] for r in rows]
+    data.insert(0, [Paragraph(str(c), ParagraphStyle(
+        "hd", parent=_cell_style, fontName="Helvetica-Bold", textColor=colors.white))
+        for c in headers])
+    t = Table(data, colWidths=widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), ACCENT),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f5f9")]),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    return t
+
+
+def build_pdf_report(audit: dict) -> bytes:
+    """Render a full_audit result as a print-ready PDF (bytes)."""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, title="SentinelBridge Report",
+                            topMargin=18 * mm, bottomMargin=18 * mm,
+                            leftMargin=18 * mm, rightMargin=18 * mm)
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("t", parent=styles["Title"], fontName="Helvetica-Bold",
+                                 fontSize=20, textColor=DARK, spaceAfter=4)
+    sub_style = ParagraphStyle("s", parent=styles["Normal"], fontSize=9, textColor=GREY)
+    h2 = ParagraphStyle("h2", parent=styles["Heading2"], fontName="Helvetica-Bold",
+                        fontSize=13, textColor=ACCENT, spaceBefore=14, spaceAfter=6)
+    body = ParagraphStyle("b", parent=styles["Normal"], fontSize=9, leading=12)
+
+    story = []
+    story.append(Paragraph(f"SentinelBridge Audit Report", title_style))
+    story.append(Paragraph(
+        f"Target: <b>{audit.get('target', '')}</b> &nbsp;|&nbsp; "
+        f"Generated: {datetime.now().isoformat(timespec='seconds')}", sub_style))
+    story.append(Spacer(1, 6 * mm))
+
+    # 1. Attack surface
+    subdomains = audit.get("subdomains", {})
+    ports = audit.get("ports", {})
+    geo = audit.get("geo", {})
+    story.append(Paragraph("1. Attack Surface — Subdomains, Ports & Location", h2))
+    rows = _host_table_rows(subdomains, ports, geo)
+    if not rows:
+        story.append(Paragraph("Network recon skipped — no domain was provided for this audit.", body))
+    else:
+        story.append(_pdf_table(["Host", "IP", "Location", "Open ports"], rows,
+                                widths=[56 * mm, 28 * mm, 58 * mm, 28 * mm]))
+
+    whois = audit.get("whois", {})
+    if whois:
+        story.append(Paragraph("Domain registration (WHOIS/RDAP)", h2))
+        wrows = [("Holder", whois.get("holder", "—")),
+                 ("Registered", whois.get("registered", "—")),
+                 ("Expires", whois.get("expires", "—"))]
+        story.append(_pdf_table(["Field", "Value"], wrows, widths=[40 * mm, 120 * mm]))
+
+    # 2. Vulnerabilities
+    pkgs = audit.get("packages", [])
+    story.append(Paragraph("2. Known Vulnerabilities (OSV + EPSS + CISA KEV)", h2))
+    if not pkgs:
+        story.append(Paragraph("No packages analysed.", body))
+    for pkg in pkgs:
+        story.append(Paragraph(f"{pkg['name']} {pkg.get('version', '')}", body))
+        vulns = pkg.get("vulns", [])
+        if not vulns:
+            story.append(Paragraph("No known vulnerabilities on record.", body))
+            continue
+        vrows = [(v["id"], _vuln_priority(v), v.get("epss", "-"),
+                  "YES" if v.get("kev") else "no") for v in vulns]
+        story.append(_pdf_table(["CVE", "Priority", "EPSS", "KEV"], vrows,
+                                widths=[60 * mm, 35 * mm, 35 * mm, 30 * mm]))
+
+    # 3. Secrets
+    leaks = audit.get("leaks", [])
+    story.append(Paragraph("3. Exposed Secrets (regex scan)", h2))
+    if not leaks:
+        story.append(Paragraph("No obvious secrets found.", body))
+    else:
+        srows = [(l["file"], l["type"]) for l in leaks]
+        story.append(_pdf_table(["File", "Finding"], srows,
+                                widths=[120 * mm, 40 * mm]))
+
+    # 4. Git history secrets
+    git_hist = audit.get("git_history", [])
+    if git_hist:
+        story.append(Paragraph("4. Secrets Ever Committed (git history)", h2))
+        story.append(Paragraph("Deleted from the working tree but still stored in old commits.", body))
+        grows = [(g["commit"], g["file"], g["type"]) for g in git_hist]
+        story.append(_pdf_table(["Commit", "File", "Finding"], grows,
+                                widths=[28 * mm, 78 * mm, 54 * mm]))
+
+    story.append(Spacer(1, 6 * mm))
+    story.append(Paragraph(
+        "Generated by SentinelBridge — open-source AI security recon assistant. "
+        "Educational project: authorized targets only.", sub_style))
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+def build_sarif_report(audit: dict) -> str:
+    """Render a full_audit result as SARIF (standard for CI / GitHub code scanning)."""
+    results = []
+    for pkg in audit.get("packages", []):
+        for v in pkg.get("vulns", []):
+            results.append({
+                "ruleId": v["id"],
+                "level": "error" if _vuln_priority(v) in ("CRITICAL", "HIGH") else "warning",
+                "message": {"text": f"{v['id']} — known vulnerability in {pkg['name']} "
+                                      f"({v.get('epss', '-')} EPSS)."},
+                "properties": {"epss": v.get("epss"), "kev": v.get("kev")},
+            })
+    for l in audit.get("leaks", []):
+        results.append({
+            "ruleId": l["type"],
+            "level": "error",
+            "message": {"text": f"Potential secret leak of type {l['type']} found."},
+            "locations": [{"physicalLocation": {"artifactLocation": {"uri": l["file"]}}}],
+        })
+
+    sarif = {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {"driver": {"name": "SentinelBridge", "informationUri": "https://modelcontextprotocol.io"}},
+            "results": results,
+        }],
+    }
+    return json.dumps(sarif, indent=2)

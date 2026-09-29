@@ -1,0 +1,6 @@
+# Demo: deliberately outdated packages (for SentinelBridge lecture)
+# Run the dashboard -> Software Inventory on this folder.
+flask==1.1.4
+django==3.2.2
+werkzeug==0.15.5
+requests==2.21.0

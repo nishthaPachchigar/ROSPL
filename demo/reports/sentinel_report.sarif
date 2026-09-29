@@ -1,0 +1,158 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "SentinelBridge",
+          "informationUri": "https://modelcontextprotocol.io"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "ALEA-2021:1834",
+          "level": "warning",
+          "message": {
+            "text": "ALEA-2021:1834 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "ALEA-2022:1767",
+          "level": "warning",
+          "message": {
+            "text": "ALEA-2022:1767 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "ALPINE-CVE-2021-23017",
+          "level": "warning",
+          "message": {
+            "text": "ALPINE-CVE-2021-23017 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "ALPINE-CVE-2021-3618",
+          "level": "warning",
+          "message": {
+            "text": "ALPINE-CVE-2021-3618 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "ALPINE-CVE-2021-46461",
+          "level": "warning",
+          "message": {
+            "text": "ALPINE-CVE-2021-46461 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "ALPINE-CVE-2021-46462",
+          "level": "warning",
+          "message": {
+            "text": "ALPINE-CVE-2021-46462 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "ALPINE-CVE-2021-46463",
+          "level": "warning",
+          "message": {
+            "text": "ALPINE-CVE-2021-46463 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "ALPINE-CVE-2022-25139",
+          "level": "warning",
+          "message": {
+            "text": "ALPINE-CVE-2022-25139 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "ALPINE-CVE-2022-41741",
+          "level": "warning",
+          "message": {
+            "text": "ALPINE-CVE-2022-41741 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "ALPINE-CVE-2022-41742",
+          "level": "warning",
+          "message": {
+            "text": "ALPINE-CVE-2022-41742 \u2014 known vulnerability in nginx (None EPSS)."
+          },
+          "properties": {
+            "epss": null,
+            "kev": false
+          }
+        },
+        {
+          "ruleId": "AWS Access Key",
+          "level": "error",
+          "message": {
+            "text": "Potential secret leak of type AWS Access Key found."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "D:\\NISHTHA\\SEM 7\\ROSPL MINI PROJ\\demo\\leaky_app\\config.env"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "Stripe Secret Key",
+          "level": "error",
+          "message": {
+            "text": "Potential secret leak of type Stripe Secret Key found."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "D:\\NISHTHA\\SEM 7\\ROSPL MINI PROJ\\demo\\leaky_app\\config.env"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

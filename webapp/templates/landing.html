@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SentinelBridge — AI Security Recon Assistant</title>
+  <style>
+    :root { --bg:#0b1020; --card:#151b2e; --line:#2a3350; --accent:#38bdf8; --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --txt:#e2e8f0; --muted:#94a3b8; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; font-family:Segoe UI, system-ui, sans-serif; background:var(--bg); color:var(--txt); }
+    nav { position:sticky; top:0; z-index:50; background:#0d1428ee; backdrop-filter:blur(6px); border-bottom:1px solid var(--line); padding:12px 26px; display:flex; align-items:center; justify-content:space-between; gap:22px; }
+    nav .brand { font-weight:800; font-size:16px; }
+    nav .brand span { color:var(--accent); }
+    nav .btn { padding:8px 16px; border-radius:8px; background:var(--accent); color:#04121f; font-weight:800; font-size:13px; text-decoration:none; }
+    nav .btn:hover { filter:brightness(1.1); }
+    .hero { min-height:52vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:60px 20px 40px; background:radial-gradient(800px 400px at 50% -80px, #1d2e56 0%, transparent 65%); }
+    .hero .logo { font-size:44px; }
+    .hero h1 { font-size:38px; margin:14px 0 6px; }
+    .hero h1 span { color:var(--accent); }
+    .hero p { color:var(--muted); font-size:15px; max-width:720px; margin:8px 0 26px; line-height:1.6; }
+    .hero .cta { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+    .hero .cta a { padding:13px 26px; border-radius:10px; font-weight:800; text-decoration:none; font-size:14px; }
+    .cta.primary { background:var(--accent); color:#04121f; }
+    .cta.ghost { border:1px solid var(--line); color:var(--txt); }
+    .hero small { color:var(--muted); margin-top:16px; font-size:12px; }
+    .wrap { max-width:1100px; margin:0 auto; padding:20px 24px 60px; }
+    section h2 { font-size:20px; margin:44px 0 6px; }
+    section .sub { color:var(--muted); font-size:13px; margin:0 0 18px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
+    .modulebox { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; transition:border-color .15s; }
+    .modulebox:hover { border-color:var(--accent); }
+    .modulebox h4 { margin:0 0 6px; font-size:15px; color:var(--accent); }
+    .modulebox p { margin:0 0 8px; font-size:12.5px; color:var(--muted); line-height:1.5; }
+    .modulebox code { color:var(--txt); font-size:11px; background:#0b1020; padding:2px 6px; border-radius:6px; }
+    .about { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; }
+    table { border-collapse:collapse; width:100%; font-size:13px; }
+    th,td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); }
+    th { color:var(--accent); font-weight:600; width:160px; }
+    footer { color:var(--muted); font-size:12px; text-align:center; padding:28px 16px; border-top:1px solid var(--line); }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="brand">🛰️ <span>SentinelBridge</span></span>
+  <a class="btn" href="/dashboard">Open Dashboard →</a>
+</nav>
+
+<section class="hero">
+  <div class="logo">🛰️</div>
+  <h1>AI Security Reconnaissance <span>Assistant</span></h1>
+  <p>Open-source OSINT + vulnerability intelligence engine, built on the <b>Model Context Protocol (MCP)</b>. Enumerate attack surfaces, scan open ports, geo-locate hosts, check CVEs against OSV / EPSS / CISA KEV, auto-detect software inventory and hunt leaked secrets — all with free APIs, no keys.</p>
+  <div class="cta">
+    <a class="cta primary" href="/dashboard">Launch Dashboard ⚡</a>
+    <a class="cta ghost" href="#modules">Explore Modules</a>
+  </div>
+  <small>100% free &amp; open-source · educational use · authorized targets only</small>
+</section>
+
+<div class="wrap">
+  <section id="modules">
+    <h2>🧩 Modules</h2>
+    <p class="sub">One engine, 9 MCP tools — all modules available on both the web dashboard and the MCP server.</p>
+    <div class="grid">
+      <div class="modulebox">
+        <h4>🔎 Recon Module</h4>
+        <p>Subdomain enumeration + live-host resolution using free Certificate Transparency logs (HackerTarget / crt.sh) with DNS brute-force fallback.</p>
+        <code>server/recon.py</code>
+      </div>
+      <div class="modulebox">
+        <h4>🚪 Port Scanner</h4>
+        <p>Concurrent TCP scan of 21 common ports (SSH/HTTP/MySQL/Redis/RDP…) per host, dangerously-exposed ports flagged red.</p>
+        <code>server/ports.py</code>
+      </div>
+      <div class="modulebox">
+        <h4>📍 GeoIP + WHOIS</h4>
+        <p>ip-api.com batch GeoIP (country/city/ISP per IP) + IANA RDAP domain registration/holder/expiry.</p>
+        <code>server/geoip.py</code>
+      </div>
+      <div class="modulebox">
+        <h4>🚨 CVE Module</h4>
+        <p>OSV vulnerability database + EPSS exploitation probability + CISA Known Exploited Vulnerabilities.</p>
+        <code>server/cve_intel.py</code>
+      </div>
+      <div class="modulebox">
+        <h4>📋 Inventory Scan</h4>
+        <p>Auto-detects software from requirements.txt / package.json / go.mod / Cargo.toml / composer.json → maps each to OSV CVEs (supply-chain view).</p>
+        <code>server/inventory.py</code>
+      </div>
+      <div class="modulebox">
+        <h4>🔑 Secrets Module</h4>
+        <p>20+ regex patterns (AWS, GitHub, Discord, Telegram, OpenAI, Groq…) — working tree + full git history scan.</p>
+        <code>server/leaks.py</code>
+      </div>
+      <div class="modulebox">
+        <h4>📄 Report Module</h4>
+        <p>Markdown (readable) + SARIF (CI/GitHub code-scanning standard) + print-ready PDF report generation.</p>
+        <code>server/report.py</code>
+      </div>
+      <div class="modulebox">
+        <h4>🤖 MCP Server</h4>
+        <p>The same engine exposed as an MCP (Model Context Protocol) server — 9 tools for any AI client. AI ka 'USB port'.</p>
+        <code>server/main.py</code>
+      </div>
+      <div class="modulebox">
+        <h4>⚡ Orchestration</h4>
+        <p>'Full Audit' chains recon → ports → geoip/whois → vulns → secrets → report (MD/SARIF/PDF) in one call.</p>
+        <code>webapp/app.py</code>
+      </div>
+    </div>
+  </section>
+
+  <section id="about">
+    <h2>ℹ️ About SentinelBridge</h2>
+    <p class="sub">An open-source OSINT + vulnerability intelligence engine. 9 MCP tools, no API keys, free data sources.</p>
+    <div class="about">
+      <table>
+        <tr><th>Protocol</th><td>Model Context Protocol (MCP) — open standard to plug tools into AI</td></tr>
+        <tr><th>Stack</th><td>Python · FastMCP · Flask · reportlab · requests</td></tr>
+        <tr><th>Data sources</th><td>crt.sh · HackerTarget · Google CT · OSV · FIRST.org EPSS · CISA KEV · ip-api · IANA RDAP</td></tr>
+        <tr><th>Cost</th><td>100% free &amp; open-source · no API keys</td></tr>
+        <tr><th>Use case</th><td>SOC threat intelligence / attack-surface reconnaissance / AI-assisted security</td></tr>
+        <tr><th>Scope</th><td>Educational project — authorized targets only</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section style="text-align:center; margin-top:44px;">
+    <a class="cta primary" href="/dashboard" style="padding:14px 30px; border-radius:10px; font-weight:800; text-decoration:none; background:var(--accent); color:#04121f;">Launch Dashboard ⚡</a>
+  </section>
+</div>
+
+<footer>⚠️ Educational project — authorized targets only. Built on free public APIs. © SentinelBridge project</footer>
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SentinelBridge — Security Recon Dashboard</title>
+  <style>
+    :root { --bg:#0b1020; --card:#151b2e; --line:#2a3350; --accent:#38bdf8; --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --txt:#e2e8f0; --muted:#94a3b8; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; font-family:Segoe UI, system-ui, sans-serif; background:var(--bg); color:var(--txt); }
+    nav { position:sticky; top:0; z-index:50; background:#0d1428ee; backdrop-filter:blur(6px); border-bottom:1px solid var(--line); padding:12px 24px; display:flex; align-items:center; gap:22px; }
+    nav .brand { font-weight:800; font-size:16px; }
+    nav .brand span { color:var(--accent); }
+    nav a { color:var(--muted); text-decoration:none; font-size:13px; }
+    nav a:hover { color:var(--txt); }
+    header { padding:26px 24px 6px; max-width:1100px; margin:0 auto; }
+    header h1 { margin:0; font-size:26px; }
+    header h1 span { color:var(--accent); }
+    header p { color:var(--muted); font-size:13px; margin:6px 0 0; }
+    main { max-width:1100px; margin:8px auto; padding:0 16px; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:18px 0; }
+    .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; text-align:center; }
+    .stat b { display:block; font-size:22px; color:var(--accent); }
+    .stat span { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-top:26px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+    .card h2 { margin:0 0 10px; font-size:15px; color:var(--accent); }
+    .card input, .card select { width:100%; padding:8px 10px; margin-bottom:8px; border:1px solid var(--line); border-radius:8px; background:#0b1020; color:var(--txt); }
+    .card button { width:100%; padding:9px; border:0; border-radius:8px; background:var(--accent); color:#04121f; font-weight:700; cursor:pointer; }
+    .card button:hover { filter:brightness(1.1); }
+    .hint { font-size:11px; color:var(--muted); }
+    .fullsection { background:var(--card); border:1px solid var(--accent); border-radius:12px; margin-top:18px; padding:18px; }
+    .fullsection h2 { margin:0 0 6px; font-size:16px; color:var(--accent); }
+    .fullsection p { color:var(--muted); font-size:12px; margin:0 0 12px; }
+    .fullform { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; align-items:end; }
+    .fullform input { width:100%; padding:9px; border:1px solid var(--line); border-radius:8px; background:#0b1020; color:var(--txt); }
+    .fullform button { padding:9px 16px; border:0; border-radius:8px; background:var(--ok); color:#041f15; font-weight:800; cursor:pointer; }
+    section { background:var(--card); border:1px solid var(--line); border-radius:12px; margin-top:18px; padding:16px; overflow-x:auto; }
+    section h3 { margin:0 0 12px; font-size:15px; }
+    table { border-collapse:collapse; width:100%; font-size:13px; }
+    th,td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); }
+    th { color:var(--muted); font-weight:600; }
+    .pill { padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+    .ok { background:#0f2e24; color:var(--ok); } .warn { background:#3a2e10; color:var(--warn); } .bad { background:#3a1515; color:var(--bad); }
+    pre { background:#0b1020; border:1px solid var(--line); border-radius:8px; padding:14px; font-size:12px; overflow-x:auto; max-height:480px; }
+    .error { background:#3a1515; color:var(--bad); padding:12px; border-radius:8px; margin-top:16px; }
+    .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-top:18px; }
+    .modulebox { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+    .modulebox h4 { margin:0 0 6px; font-size:14px; color:var(--accent); }
+    .modulebox p { margin:0 0 8px; font-size:12px; color:var(--muted); }
+    .modulebox code { color:var(--txt); font-size:11px; background:#0b1020; padding:2px 6px; border-radius:6px; }
+    .dl { display:inline-block; margin:8px 8px 0 0; padding:8px 14px; border-radius:8px; font-size:12px; font-weight:700; text-decoration:none; }
+    .dl.md { background:var(--warn); color:#241d08; } .dl.sarif { background:var(--accent); color:#04121f; } .dl.pdf { background:#f472b6; color:#2b0a1e; }
+    footer { color:var(--muted); font-size:12px; text-align:center; padding:28px 16px; border-top:1px solid var(--line); margin-top:30px; }
+    .activity { font-size:12px; }
+    .actscroll { max-height:220px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:4px 10px; }
+    .activity li { padding:5px 0; border-bottom:1px solid var(--line); }
+    .activity li:last-child { border:0; }
+    .okdot { color:var(--ok); } .baddot { color:var(--bad); }
+    .charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:18px; }
+    .chartbox { background:#0b1020; border:1px solid var(--line); border-radius:10px; padding:12px; min-width:0; }
+    .chartbox b { font-size:12px; color:var(--muted); }
+    .chart { display:flex; align-items:flex-end; gap:3px; height:104px; margin-top:8px; border-bottom:1px solid var(--line); }
+    .barcol { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; overflow:hidden; }
+    .barcol span { font-size:9px; color:var(--muted); line-height:10px; padding-top:2px; white-space:nowrap; }
+    .vbar { width:100%; max-width:16px; background:linear-gradient(180deg,var(--accent),var(--ok)); border-radius:3px 3px 0 0; }
+    .vbar.zero { background:#2a3350; }
+    .modal-overlay { position:fixed; inset:0; background:rgba(6,10,22,.55); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; z-index:100; }
+    .modal-card { width:min(480px,92vw); background:var(--card); border:1px solid var(--accent); border-radius:14px; padding:26px; box-shadow:0 18px 60px rgba(0,0,0,.5); }
+    .modal-card h3 { margin:0 0 4px; font-size:17px; color:var(--accent); }
+    .modal-card .sub { color:var(--muted); font-size:12px; margin:0 0 18px; }
+    .track { height:12px; background:#0b1020; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+    .bar { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--ok)); border-radius:999px; transition:width .6s ease; }
+    .stage { margin-top:13px; display:flex; align-items:center; gap:10px; font-size:14px; }
+    .dot { width:10px; height:10px; border-radius:50%; background:var(--accent); animation:pulse 1.2s infinite; }
+    .dot.error { background:var(--bad); animation:none; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .detail { color:var(--muted); font-size:12px; margin-top:8px; word-break:break-all; min-height:16px; }
+    .pct { color:var(--muted); font-size:12px; margin-top:6px; }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="brand">🛰️ <span>SentinelBridge</span></span>
+  <span style="flex:1"></span>
+  <a href="#audit">Full Audit</a>
+  <a href="/dashboard#history">History</a>
+  <a href="/compare">Compare</a>
+  <a href="#activity">Activity</a>
+  <a href="#reports">Reports</a>
+  <a href="/">Overview</a>
+</nav>
+
+<header>
+  <h1>AI Security Reconnaissance <span>Dashboard</span></h1>
+  <p>Open-source OSINT + vulnerability intelligence · MCP + FastMCP · free APIs (OSV · EPSS · CISA KEV · CT logs · ip-api · RDAP) · no API keys · port scan · inventory scan · PDF reports</p>
+</header>
+
+<main>
+  {% if error %}<div class="error">⚠️ {{ error }}</div>{% endif %}
+
+  <div class="stats">
+    <div class="stat"><b>{{ subdomains|length if subdomains else 0 }}</b><span>subdomains</span></div>
+    <div class="stat"><b>{{ pkg_rows|map(attribute='vulns')|map('count')|sum if pkg_rows else 0 }}</b><span>vulns found</span></div>
+    <div class="stat"><b>{{ secrets|length if secrets else 0 }}</b><span>secrets</span></div>
+    <div class="stat"><b>MCP</b><span>protocol</span></div>
+  </div>
+
+  {% if live_hosts and job_id %}
+  <div style="margin-top:14px"><a class="dl md" href="/graph/{{ job_id }}">🕸️ View network graph</a></div>
+  {% endif %}
+
+  {% if history is defined %}
+  <section id="history">
+    <h3>📈 Trend charts — last 14 days</h3>
+    <div class="charts">
+      {% set maxh = trends|map(attribute='hosts')|max if trends else 0 %}
+      {% set maxv = trends|map(attribute='vulns')|max if trends else 0 %}
+      {% set maxs = trends|map(attribute='secrets')|max if trends else 0 %}
+      {% for label, attr, mx in [('hosts online', 'hosts', maxh), ('CVEs found', 'vulns', maxv), ('secrets found', 'secrets', maxs)] %}
+      <div class="chartbox">
+        <b>{{ label }}</b>
+        <div class="chart">
+          {% for m in trends %}
+          {% set h = (78 * m[attr] / mx if mx and m[attr] else 0) %}
+          <div class="barcol" title="{{ m.dayf }} · {{ m[attr] }}">
+            <div class="vbar {{ 'zero' if not m[attr] else '' }}" style="height:{{ h|round(1) if h else '2' }}%"></div>
+            <span>{{ m.day }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <h3>🕘 Past Scans — {{ history|length }}</h3>
+    <table>
+      <tr><th>When</th><th>Module</th><th>Target</th><th>Live</th><th>Pkgs</th><th>Vulns</th><th>Secrets</th><th></th></tr>
+      {% for s in history %}
+      <tr>
+        <td>{{ s.created }}</td>
+        <td><span class="pill ok">{{ s.module }}</span></td>
+        <td><code>{{ s.target|truncate(34) }}</code></td>
+        <td>{{ s.live_hosts }}</td>
+        <td>{{ s.packages }}</td>
+        <td>{{ s.vulns }}</td>
+        <td>{{ s.secrets }}</td>
+        <td><a href="/past/{{ s.id }}">open →</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+  {% endif %}
+
+  {% if certs %}
+  <section>
+    <h3>🔐 TLS Certificate Analysis</h3>
+    {% for c in certs %}
+    <h4 style="margin:0 0 8px">{{ c.host }}</h4>
+    <table>
+      <tr><th>Subject CN</th><td>{{ c.subject_cn }}</td><th>Organization</th><td>{{ c.subject_o }}</td></tr>
+      <tr><th>Issuer</th><td colspan="3">{{ c.issuer_cn }} · {{ c.issuer_o }}</td></tr>
+      <tr><th>Validity</th><td colspan="3">{{ c.not_before }} → {{ c.not_after }} &nbsp;·&nbsp; <span class="pill {{ 'bad' if c.expiring_soon or c.expired else 'ok' }}">{{ c.days_left }} days left</span></td></tr>
+      <tr><th>Signature / key</th><td colspan="3"><code>{{ c.sig_alg }}</code> · {{ c.key_bits or '—' }}-bit {% if c.sha1 %}&nbsp;<span class="pill bad">weak SHA-1</span>{% endif %}</td></tr>
+      <tr><th>Serial</th><td colspan="3"><code>{{ c.serial }}</code></td></tr>
+      <tr><th>Alt names ({{ c.san_total }})</th><td colspan="3">{% for s in c.san %}<span class="pill ok">{{ s }}</span> {% endfor %}{% if c.san_total > c.san|length %}<span class="pill">+{{ c.san_total - c.san|length }} more</span>{% endif %}</td></tr>
+    </table>
+    {% if c.expired %}<div class="error">⛔ Certificate expired — connections may be rejected by modern clients.</div>{% elif c.expiring_soon %}<div class="error">⚠️ Certificate expires within 10 days — renew soon.</div>{% endif %}
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <div class="cards">
+    <div class="card">
+      <h2>🔎 Domain Recon</h2>
+      <form id="reconform" method="post" action="/recon">
+        <input name="domain" placeholder="example.com" value="{{ domain or 'wikipedia.org' }}">
+        <button type="submit">Find subdomains</button>
+      </form>
+      <div class="hint">CT logs + port scan + GeoIP + WHOIS (free, no key)</div>
+    </div>
+    <div class="card">
+      <h2>🚨 CVE Lookup</h2>
+      <form id="cveform" method="post" action="/cve">
+        <input name="cve_id" placeholder="CVE-2023-44487" value="CVE-2023-44487">
+        <button type="submit">Get intel</button>
+      </form>
+      <div class="hint">EPSS exploitation probability + CISA KEV status</div>
+    </div>
+    <div class="card">
+      <h2>📦 Software Vulns</h2>
+      <form id="vulnsform" method="post" action="/vulns">
+        <input name="software" placeholder="nginx" value="nginx">
+        <input name="version" placeholder="1.18.0" value="1.18.0">
+        <button type="submit">Scan package</button>
+      </form>
+      <div class="hint">OSV database — no API key</div>
+    </div>
+    <div class="card">
+      <h2>📋 Software Inventory</h2>
+      <form id="invform" method="post" action="/inventory">
+        <input name="folder" placeholder="folder path or GitHub URL (blank = demo)" value="{{ folder or '' }}">
+        <button type="submit">Auto-scan packages</button>
+      </form>
+      <div class="hint">reads manifest files in a folder or GitHub repo → OSV</div>
+    </div>
+    <div class="card">
+      <h2>🔑 Leaked Secrets</h2>
+      <form id="secretsform" method="post" action="/secrets">
+        <input name="folder" placeholder="folder path or GitHub URL (blank = demo)" value="{{ folder or '' }}">
+        <button type="submit">Scan for secrets</button>
+      </form>
+      <div class="hint">public GitHub repos cloned on the fly · tree + git history</div>
+    </div>
+  </div>
+
+  <div class="fullsection" id="audit">
+    <h2>⚡ Full Security Audit — one click, all modules</h2>
+    <p>Scan a <b>domain</b>, a <b>code repo</b>, <b>packages</b>, or any combination (at least one required):
+    domain → recon + port scan + GeoIP/WHOIS · repo/folder → auto inventory + leaked secrets + git history · packages → CVE check.
+    Get a downloadable report (Markdown / SARIF / PDF).</p>
+    <form class="fullform" id="fullform" method="post" action="/full">
+      <input name="domain" placeholder="domain (optional, blank = repo/packages-only)" value="{{ domain or '' }}">
+      <input name="packages" placeholder="packages (optional, e.g. nginx 1.18.0)" value="{{ packages or '' }}">
+      <input name="code_dir" placeholder="folder or GitHub URL (optional, blank = domain/packages-only)">
+      <button type="submit">Run Full Audit</button>
+    </form>
+  </div>
+
+  {% if activity %}
+  <section id="activity">
+    <h3>🕓 Activity Log</h3>
+    <div class="actscroll">
+      <ul class="activity">
+        {% for a in activity %}
+        <li><span class="{{ 'okdot' if a.ok else 'baddot' }}">{{ '●' if a.ok else '✕' }}</span> <b>{{ a.module }}</b> — {{ a.detail }} <span style="color:var(--muted)">({{ a.time }})</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if cve_result %}
+  <section>
+    <h3>🚨 CVE Intelligence — {{ cve_result.cve }}</h3>
+    <p>{{ cve_result.summary or '(no summary on record)' }}</p>
+    <table>
+      <tr><th>Severity vector</th><td><code>{{ cve_result.severity }}</code></td></tr>
+      <tr><th>Published</th><td>{{ cve_result.published }}</td></tr>
+      <tr><th>EPSS score</th><td>{{ cve_result.epss if cve_result.epss is not none else 'N/A' }}</td></tr>
+      <tr><th>EPSS percentile</th><td>{{ cve_result.percentile if cve_result.percentile is not none else 'N/A' }}</td></tr>
+      <tr><th>CISA KEV (actively exploited)</th><td>{{ '🎯 YES' if cve_result.kev else 'no' }}</td></tr>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if subdomains %}
+  <section>
+    <h3>🔎 Hosts for {{ domain }} — {{ subdomains|length }} found, {{ live_hosts|length }} live (ports + location)</h3>
+    <table>
+      <tr><th>Host</th><th>IP</th><th>Location</th><th>Open ports</th></tr>
+      {% for host in subdomains[:60] %}
+      {% set ip = live_hosts.get(host, '—') %}
+      <tr>
+        <td>{{ host }}</td>
+        <td>{{ ip }}</td>
+        <td>{{ geo.get(ip, {}).get('country', '') if ip != '—' }}{{ ', ' ~ geo.get(ip, {}).get('city', '') if (ip != '—' and geo.get(ip, {}).get('city')) }}{{ ' · ' ~ geo.get(ip, {}).get('isp', '') if (ip != '—' and geo.get(ip, {}).get('isp')) }}</td>
+        <td>
+          {% if ports.get(host) %}
+            {% for p in ports.get(host) %}
+              {% if p.sensitive %}<span class="pill bad" title="{{ p.service }}">🔴 {{ p.port }}</span>{% else %}<span class="pill ok">{{ p.port }}</span>{% endif %}
+            {% endfor %}
+          {% else %}<span style="color:var(--muted)">—</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+  {% endif %}
+
+  {% if whois %}
+  <section>
+    <h3>🌐 Domain registration — {{ whois.domain }} (RDAP/WHOIS)</h3>
+    <table>
+      <tr><th>Holder</th><td>{{ whois.holder or '—' }}</td></tr>
+      <tr><th>Registered</th><td>{{ whois.registered or '—' }}</td></tr>
+      <tr><th>Expires</th><td>{{ whois.expires or '—' }}</td></tr>
+    </table>
+  </section>
+  {% endif %}
+
+  {% if vulns %}
+  <section>
+    <h3>📦 Known vulnerabilities — {{ software }}</h3>
+    <table>
+      <tr><th>ID</th><th>Published</th><th>EPSS</th><th>KEV</th></tr>
+      {% for v in vulns %}
+      <tr><td><code>{{ v.id }}</code></td><td>{{ v.published }}</td><td>{{ v.epss if v.epss is not none else '—' }}</td><td>{{ 'YES' if v.kev else 'no' }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+  {% endif %}
+
+  {% if pkg_rows %}
+  <section>
+    <h3>📦 Package vulnerability audit</h3>
+    {% for p in pkg_rows %}
+      <h4>{{ p.name }} {{ p.version }}</h4>
+      <table>
+        <tr><th>ID</th><th>Priority</th><th>EPSS</th><th>KEV</th></tr>
+        {% for v in p.vulns %}
+        <tr><td><code>{{ v.id }}</code></td><td>{{ 'CRITICAL' if v.kev or (v.epss and v.epss >= 0.9) else v.severity or 'INFO' }}</td><td>{{ v.epss if v.epss is not none else '—' }}</td><td>{{ 'YES' if v.kev else 'no' }}</td></tr>
+        {% endfor %}
+      </table>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if inv_rows %}
+  <section>
+    <h3>📋 Software inventory — {{ inv_folder }} — {{ inv_packages|length }} packages detected</h3>
+    <table>
+      <tr><th>Package</th><th>Version</th><th>Source</th><th>Vulns</th></tr>
+      {% for p in inv_packages %}
+      {% set found = inv_rows | selectattr('name', 'equalto', p.name) | selectattr('version', 'equalto', p.version) | list %}
+      <tr>
+        <td><code>{{ p.name }}</code></td>
+        <td>{{ p.version }}</td>
+        <td><code>{{ p.source }}</code></td>
+        <td>{% if found and found[0].vulns %}<span class="pill bad">{{ found[0].vulns|length }} known</span>{% else %}<span class="pill ok">clean</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </section>
+  {% endif %}
+
+  {% if secrets %}
+  <section>
+    <h3>🔑 Leaked secrets in <code>{{ folder }}</code> — {{ secrets|length }} findings</h3>
+    <table><tr><th>File</th><th>Type</th></tr>
+      {% for s in secrets %}<tr><td><code>{{ s.file }}</code></td><td><span class="pill bad">{{ s.type }}</span></td></tr>{% endfor %}
+    </table>
+  </section>
+  {% endif %}
+
+  {% if git_history %}
+  <section>
+    <h3>🧾 Git commit history — {{ git_history|length }} secrets ever committed</h3>
+    <table><tr><th>Commit</th><th>File</th><th>Type</th></tr>
+      {% for g in git_history %}<tr><td><code>{{ g.commit }}</code></td><td><code>{{ g.file }}</code></td><td><span class="pill bad">{{ g.type }}</span></td></tr>{% endfor %}
+    </table>
+  </section>
+  {% endif %}
+
+  {% if report_md %}
+  <section id="reports">
+    <h3>📄 Audit Report — {{ audit_target or domain or 'code repository' }}</h3>
+    <a class="dl md" href="/report/{{ report_id }}/md">⬇ Download Markdown</a>
+    <a class="dl sarif" href="/report/{{ report_id }}/sarif">⬇ Download SARIF</a>
+    <a class="dl pdf" href="/report/{{ report_id }}/pdf">⬇ Download PDF</a>
+    <pre>{{ report_md }}</pre>
+  </section>
+  {% endif %}
+
+  <footer>⚠️ Educational project — authorized targets only. Built on free public APIs. © SentinelBridge project</footer>
+</main>
+
+<div class="modal-overlay" id="scanModal">
+  <div class="modal-card">
+    <h3 id="mhead">🛰️ Running Full Security Audit</h3>
+    <p class="sub">All modules run in the background — results load right here when done.</p>
+    <div class="track"><div class="bar" id="mbar"></div></div>
+    <div class="stage"><span class="dot" id="mdot"></span><span id="mstage">Starting…</span></div>
+    <div class="detail" id="mdetail"></div>
+    <div class="pct" id="mpct">0%</div>
+    <p class="sub" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px;">This page updates live every second and shows results when done. You can <a href="#" id="closeModal" style="color:var(--accent)">return to the dashboard</a> anytime — the scan keeps running.</p>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const HEADINGS = {
+    reconform: "🔎 Running Domain Reconnaissance",
+    cveform: "🩺 Fetching CVE Intelligence",
+    vulnsform: "📦 Checking Software Vulnerabilities",
+    invform: "🧰 Building Software Inventory",
+    secretsform: "🔑 Scanning for Leaked Secrets",
+    fullform: "🛰️ Running Full Security Audit"
+  };
+
+  const closeLink = document.getElementById("closeModal");
+  if (closeLink) {
+    closeLink.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      document.getElementById("scanModal").style.display = "none";
+    });
+  }
+
+  Object.keys(HEADINGS).forEach(function (fid) {
+    const form = document.getElementById(fid);
+    if (!form) return;
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const modal = document.getElementById("scanModal");
+      modal.style.display = "flex";
+      document.getElementById("mhead").textContent = HEADINGS[fid];
+      document.getElementById("mbar").style.width = "2%";
+      document.getElementById("mpct").textContent = "0%";
+      document.getElementById("mstage").textContent = "Preparing…";
+      document.getElementById("mdetail").textContent = "";
+      document.getElementById("mdot").className = "dot";
+      fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.job_id) {
+            document.getElementById("mstage").textContent = "Failed to start scan";
+            document.getElementById("mdot").className = "dot error";
+            return;
+          }
+          poll(res.job_id);
+        })
+        .catch(function () {
+          document.getElementById("mstage").textContent = "Failed to start scan";
+          document.getElementById("mdot").className = "dot error";
+        });
+    });
+  });
+
+  function poll(job) {
+    const t = setInterval(function () {
+      fetch("/api/scan/" + job)
+        .then(function (r) { return r.json(); })
+        .then(function (a) {
+          const prog = a.progress || 0;
+          document.getElementById("mbar").style.width = Math.max(prog, 2) + "%";
+          document.getElementById("mstage").textContent = a.stage || "Working…";
+          document.getElementById("mdetail").textContent = a.detail || "";
+          document.getElementById("mpct").textContent = prog + "%";
+          if (a.status === "done") {
+            clearInterval(t);
+            location.href = "/results/" + job;
+          } else if (a.status === "error") {
+            clearInterval(t);
+            document.getElementById("mdot").className = "dot error";
+            document.getElementById("mstage").textContent = a.error || "Scan failed";
+          }
+        });
+    }, 1000);
+  }
+});
+</script>
+</body>
+</html>
