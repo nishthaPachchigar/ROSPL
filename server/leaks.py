@@ -116,9 +116,6 @@ def scan_git_history(repo_path: str, max_kb: int = 4096) -> list[dict]:
     working tree — this is the classic gitleaks-style check.
     """
     findings: list[dict] = []
-    if not os.path.isdir(os.path.join(repo_path, ".git")):
-        return findings
-
     cmd = ["git", "-C", repo_path, "log", "-p", "--all"]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True,
